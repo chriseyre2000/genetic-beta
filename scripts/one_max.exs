@@ -1,4 +1,4 @@
-population = for _ <- 1..100, do: for _ <- 1..40, do: Enum.random(0..1)
+population = for _ <- 1..100, do: for _ <- 1..42, do: Enum.random(0..1)
 
 evaluate = fn population ->
   Enum.sort_by(population, &Enum.sum/1, &>=/2)
@@ -20,6 +20,19 @@ crossover = fn population ->
     end)
 end
 
+mutation = fn population ->
+  population
+    |> Enum.map(
+      fn chromosome ->
+        if :rand.uniform <= 0.05 do
+          Enum.shuffle(chromosome)
+        else
+          chromosome
+        end
+      end
+    )
+end
+
 algorithm =
   fn population, algorithm ->
     best = Enum.max_by(population, &Enum.sum/1)
@@ -31,6 +44,7 @@ algorithm =
         |> evaluate.()
         |> selection.()
         |> crossover.()
+        |> mutation.()
         |> algorithm.(algorithm)
     end
   end
