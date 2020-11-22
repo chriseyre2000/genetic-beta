@@ -16,8 +16,8 @@ defmodule OneMax do
   end
 
   @impl true
-  def terminate?(population) do
-    hd(population).fitness == 42
+  def terminate?(_population, _generation, temperture) do
+    temperture < 25
   end
 
 end
