@@ -17,10 +17,27 @@ defmodule Genetic do
       |> Enum.sort_by(fitness_function, &>=/2)
   end
 
-  def select(population, _opts \\ []) do
-    population
+  def select(population, opts \\ []) do
+    select_fn = Keyword.get(opts, :selection_type, &Toolbox.Selection.natural/2)
+
+    selection_rate = Keyword.get(opts, :selection_rate, 0.8)
+
+    n = round(length(population) * selection_rate)
+
+    n = if rem(n, 2) == 0, do: n, else: n + 1
+
+    parents = select_fn
+      |> apply([population, n])
+
+    leftover = population
+      |> MapSet.new()
+      |> MapSet.difference( MapSet.new(parents))
+
+    parents
       |> Enum.chunk_every(2)
       |> Enum.map(&List.to_tuple/1)
+
+    {parents, MapSet.to_list(leftover)}
   end
 
   def crossover(population, _opts \\ []) do
@@ -46,24 +63,22 @@ defmodule Genetic do
 
   def run(problem, opts \\ []) do
     initialize(&problem.genotype/0, opts)
-      |> evolve(problem, 0, 0, 0, opts)
+      |> evolve(problem, 0, opts)
   end
 
-  def evolve(population, problem, generation, last_max_fitness, temperature, opts \\ []) do
+  def evolve(population, problem, generation, opts \\ []) do
     population = evaluate(population, &problem.fitness_function/1, opts)
-    best = Enum.max_by(population, &problem.fitness_function/1).fitness
-    temperature = 0.8 * (best - last_max_fitness)
+    best = hd(population)
 
     IO.write("\rCurrent Best: #{best}")
-    if problem.terminate?(population, generation, temperature) do
+    if problem.terminate?(population, generation) do
       hd(population)
     else
-      generation = generation + 1
-      population
-        |> select(opts)
-        |> crossover(opts)
+      {parents, leftover} = select(population, opts)
+      children = crossover(parents, opts)
+      children ++ leftover
         |> mutation(opts)
-        |> evolve(problem, generation, best, temperature, opts)
+        |> evolve(problem, generation + 1, opts)
     end
   end
 end
