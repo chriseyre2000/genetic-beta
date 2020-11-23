@@ -33,21 +33,41 @@ defmodule Genetic do
       |> MapSet.new()
       |> MapSet.difference( MapSet.new(parents))
 
-    parents
+    parents = parents
       |> Enum.chunk_every(2)
       |> Enum.map(&List.to_tuple/1)
 
     {parents, MapSet.to_list(leftover)}
   end
 
-  def crossover(population, _opts \\ []) do
+  def crossover(population, opts \\ []) do
+    crossover_fn = Keyword.get( opts, :crossover_type, &Toolbox.Crossover.single_point/2 )
+
+    IO.inspect(population)
+
     population
-      |> Enum.reduce([], fn {p1, p2}, acc ->
-        cx_point = :rand.uniform(length(p1.genes))
-        {{h1, t1}, {h2, t2}} = {Enum.split(p1.genes, cx_point), Enum.split(p2.genes, cx_point)}
-        {c1, c2} = {%Chromosome{ genes: h1 ++ t2}, %Chromosome{ genes: h2 ++ t1}}
-        [c1 , c2 | acc]
-      end )
+      |> Enum.reduce([],
+        fn {p1, p2}, acc ->
+          {c1, c2} = apply(crossover_fn, [p1, p2])
+          [c1 , c2 | acc]
+        end )
+      |> Enum.map(&repair_chromosome/1)
+  end
+
+  defp repair_chromosome(chromosome) do
+    IO.puts("repair")
+    IO.inspect(chromosome)
+    chromosome = MapSet.new(chromosome)
+    repair_helper(chromosome, 8)
+  end
+
+  defp repair_helper(chromosome, k) do
+    if MapSet.size(chromosome) >= k do
+      MapSet.to_list(chromosome)
+    else
+      num = :rand.uniform(8)
+      repair_helper(MapSet.put(chromosome, num), k)
+    end
   end
 
   def mutation(population, _opts \\ []) do
@@ -69,8 +89,7 @@ defmodule Genetic do
   def evolve(population, problem, generation, opts \\ []) do
     population = evaluate(population, &problem.fitness_function/1, opts)
     best = hd(population)
-
-    IO.write("\rCurrent Best: #{best}")
+    IO.write("\rCurrent Best: #{best.fitness}")
     if problem.terminate?(population, generation) do
       hd(population)
     else
